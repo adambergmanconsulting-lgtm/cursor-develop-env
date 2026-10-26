@@ -2,9 +2,20 @@
 
 Personal **develop environment** config for Cursor: how agents, My Machines workers, and local CI runners should behave across your desks (for example a desktop + laptop pair).
 
-Not tied to any product repo. Product repos (TeamResume, others) stay thin: they consume the env vars and conventions defined here; they do not own worker installers or peer topology.
-
 Formerly `cursor-my-machines` (Windows worker autostart only). Same scripts; broader purpose.
+
+## Relation to product repos (like Railkit)
+
+Same posture as [railkit](https://github.com/adambergmanconsulting-lgtm/railkit): **apply** this to your desks, **improve** how you work, optionally **graduate** a practice into a host repo as that host's own docs/checks.
+
+| Do | Do not |
+|----|--------|
+| Install and run this on each develop PC | Add this repo as a submodule, package, or required clone of TeamResume (or any product) |
+| Keep worker installers and peer topology here | Make product CI, skills, or `npm` scripts fail if this repo is missing |
+| When a habit proves useful, copy a **thin native** rule into the product (product-owned, no link required) | Import or `require()` this repo from product code |
+| Improve process here first (pair policy, autostart, handoff helpers) | Treat product release/doctor/runner **implementation** as belonging here |
+
+**TeamResume (and other hosts) must stay fully usable without `cursor-develop-env`.** Single-machine defaults, `/release`, and local runners remain product-owned. This repo is optional operator tooling and process R&D.
 
 ## Idea
 
@@ -15,20 +26,20 @@ Configure a develop environment once. After that, day-to-day prompts should not 
 | **Coding host** | Where you (or an IDE agent) are actively developing. Often has `dev` / Next or `CURSOR_DEV_I_AM_CODING=1`. |
 | **Ship peer** | The other machine in the pair. Preferred for exclusive build / ship / long CI work so the coding host stays free. |
 
-Busy-host detection → prefer peer for **build-class** work is **policy in this repo**, not a product-repo skill invention.
+Busy-host detection → prefer peer for **build-class** work is **policy invented and iterated here**. A product may later adopt an equivalent thin rule in its own tree; until then, behavior comes from this env + how you start agents, not from a product dependency.
 
 ## What lives here
 
 - Windows autostart for Cursor [My Machines](https://cursor.com/docs/cloud-agent/my-machines) workers
 - Stable worker names and peer env vars
-- Develop-env policy: coding vs ship peer, local runners on the ship host when a product uses self-hosted CI
-- Verify / uninstall helpers
+- Develop-env policy: coding vs ship peer, local-runner *placement* habits when a product supports self-hosted CI
+- Verify / uninstall helpers; optional generic handoff helpers (no product imports)
 
 ## What stays in product repos
 
-- Product skills (`/release`, feedback, commit shape)
+- Product skills (`/release`, feedback, commit shape), with or without any mention of this repo
 - Product runner labels, `npm run release`, Azure / doctor gates
-- Thin adapters that **read** `CURSOR_DEV_*` (or product aliases) and hand off ship work to the peer
+- Any graduated thin adapter the product chooses to own (optional; never required to clone this repo)
 
 ## Prerequisites (each PC)
 
