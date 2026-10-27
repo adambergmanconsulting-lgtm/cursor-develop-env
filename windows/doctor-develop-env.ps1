@@ -28,8 +28,9 @@ $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
 Write-Check -Ok ($null -ne $task) -Message "Scheduled task '$TaskName' registered"
 
 $action = $task.Actions | Select-Object -First 1
-$hidden = $action -and ($action.Arguments -match '-WindowStyle Hidden')
-Write-Check -Ok ([bool]$hidden) -Message 'Task action uses -WindowStyle Hidden'
+$vbsLauncher = [System.IO.Path]::ChangeExtension($StartScriptPath, '.vbs')
+$silentLaunch = $action -and ($action.Execute -match 'wscript\.exe$') -and (Test-Path -LiteralPath $vbsLauncher)
+Write-Check -Ok ([bool]$silentLaunch) -Message 'Task launches via wscript silent VBS (no console)'
 
 Write-Check -Ok (Test-Path -LiteralPath $StartScriptPath) -Message "Start script exists: $StartScriptPath"
 
