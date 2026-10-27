@@ -21,13 +21,18 @@ cursor-develop-env/
   .gitignore
   windows/
     _WorkerAutostartCommon.ps1
-    install-my-machines-autostart.ps1   # default enroll: machine-scoped worker
+    install-my-machines-autostart.ps1   # default enroll: machine-scoped worker + always-on
     install-repo-worker-autostart.ps1   # optional: one git checkout
     doctor-develop-env.ps1              # verify enrollment
     bootstrap.ps1                       # optional: clone kit + enroll
+    power/
+      apply-never-sleep-user.ps1        # re-apply user always-on (also run by enroll)
+      apply-never-sleep-admin-once.ps1  # optional elevated: hibernate off, no auto-reboot
 ```
 
-Installers **write** generated start scripts, set `CURSOR_DEV_*` user env, and register a **per-user** scheduled task at logon. They do not run the worker during install (except the user may run the generated script manually).
+Installers **write** generated start scripts, set `CURSOR_DEV_*` user env, apply **always-on** user power settings, and register a **per-user** scheduled task at logon. They do not run the worker during install (except the user may run the generated script manually).
+
+**Always-on (required for reachable My Machines):** enroll calls `Set-DevelopEnvNeverSleep` unless `-SkipNeverSleep`. Generated start script calls `Enable-WorkerStayAwake` (`ES_CONTINUOUS | ES_SYSTEM_REQUIRED` in C#) for the worker host lifetime. Do **not** reintroduce a separate `CursorSelfHosted-KeepAwake` task — install/uninstall removes that legacy task. Wake-on-agent-activity is out of scope (asleep PCs are not a reliable Cloud Agent target).
 
 ## Develop-env policy (canonical here)
 
@@ -43,7 +48,8 @@ If a product later adds peer handoff, keep it optional (honor env when set; no-o
 1. **Machine-scoped default:** `WorkerRoot` is `%LOCALAPPDATA%\cursor-agent\machine-workspace`, must **not** contain `.git`. Avoids `repo=` routing labels.
 2. **Repo-scoped optional:** `-WorkerDir` must be an existing checkout; git remote drives Cursor routing labels.
 3. **Idempotent start:** generated start script skips if a `node.exe` process with `cursor-agent` and `worker` in its command line is already running.
-4. **Silent start:** scheduled task uses `-WindowStyle Hidden`; generated script invokes `cursor-agent.ps1` **in-process** (never `agent.cmd`, which spawns a second visible `powershell.exe`).
+4. **Silent start:** scheduled task uses `-WindowStyle Hidden`; generated script invokes `cursor-agent.ps1` **in-process** (never `agent.cmd`, which spawns a second visible `powershell.exe`) and **force-hides** its console via `ShowWindow` (Task Scheduler often ignores `-WindowStyle Hidden` for Interactive long-running tasks). Worker stdout goes to the autostart log.
+4b. **Always-on:** user power plan never idle-sleeps; worker host holds `SetThreadExecutionState`. No second keep-awake scheduled task.
 5. **Auth:** rely on persisted `agent login` on that Windows user. Task uses `LogonType Interactive` for the installing user. Do not store tokens in this repo.
 6. **Fleet env:** installers accept `-WorkerName` / `-PeerWorker` and write user env via `Set-DevelopEnvUserVars`.
 7. **Scheduled task:** name `Cursor Agent Worker` (machine) or `Cursor Agent Worker (repo)` (repo). Unlimited runtime (`ExecutionTimeLimit` zero), restart on failure, `MultipleInstances IgnoreNew`.

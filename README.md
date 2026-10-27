@@ -42,6 +42,15 @@ Installer effects:
 - Neutral machine workspace under `%LOCALAPPDATA%\cursor-agent\machine-workspace` (not a git repo)
 - User env: `CURSOR_DEV_WORKER_NAME`, `CURSOR_DEV_PEER_WORKER`
 - Scheduled task `Cursor Agent Worker`
+- **Always-on power:** never idle sleep / hibernate / display / disk off (user scheme). The worker host also holds `SetThreadExecutionState` while it runs. Cloud Agents only reach desks that are awake with an online worker — sleep-until-job is not reliable, so enroll keeps the PC up.
+
+Escape hatch if this desk should still sleep: add `-SkipNeverSleep` (worker stay-awake still applies only while the host process is running).
+
+Optional once as Administrator (hibernate fully off, no Windows Update auto-reboot while logged on):
+
+```powershell
+Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PWD\power\apply-never-sleep-admin-once.ps1`""
+```
 
 Then open [cursor.com/agents](https://cursor.com/agents) and choose this machine under **My Machines**.
 

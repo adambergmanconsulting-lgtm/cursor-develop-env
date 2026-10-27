@@ -16,7 +16,8 @@ param(
     [string] $PeerWorker = $(if ($env:CURSOR_DEV_PEER_WORKER) { $env:CURSOR_DEV_PEER_WORKER } else { '' }),
     [string] $TaskName = 'Cursor Agent Worker (repo)',
     [switch] $Uninstall,
-    [switch] $SkipAuthCheck
+    [switch] $SkipAuthCheck,
+    [switch] $SkipNeverSleep
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,6 +57,13 @@ Register-WorkerAutostartTask -Name $TaskName -ScriptPath $startScriptPath -Descr
 
 Write-InstallStep 'Setting personal fleet user env...'
 Set-DevelopEnvUserVars -WorkerName $WorkerName -PeerWorker $PeerWorker
+
+if (-not $SkipNeverSleep) {
+    Write-InstallStep 'Configuring always-on power (never idle sleep)...'
+    Set-DevelopEnvNeverSleep
+} else {
+    Write-InstallStep 'Skipped always-on power (-SkipNeverSleep).'
+}
 
 Write-InstallStep ''
 Write-InstallStep 'Done.'

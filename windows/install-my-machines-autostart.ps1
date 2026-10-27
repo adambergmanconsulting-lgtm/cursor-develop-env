@@ -1,5 +1,5 @@
 # Enrolls this Windows machine into a personal Cursor develop environment
-# (machine-scoped My Machines worker at logon).
+# (machine-scoped My Machines worker at logon, always-on power).
 #
 # Prerequisites:
 #   Git for Windows (Git Bash): https://git-scm.com/download/win
@@ -12,6 +12,7 @@
 #
 # Optional:
 #   .\install-my-machines-autostart.ps1 -Uninstall
+#   .\install-my-machines-autostart.ps1 ... -SkipNeverSleep
 
 [CmdletBinding()]
 param(
@@ -20,7 +21,8 @@ param(
     [string] $WorkerRoot = (Join-Path $env:LOCALAPPDATA 'cursor-agent\machine-workspace'),
     [string] $TaskName = 'Cursor Agent Worker',
     [switch] $Uninstall,
-    [switch] $SkipAuthCheck
+    [switch] $SkipAuthCheck,
+    [switch] $SkipNeverSleep
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,8 +63,16 @@ Register-WorkerAutostartTask -Name $TaskName -ScriptPath $startScriptPath -Descr
 Write-InstallStep 'Setting personal fleet user env...'
 Set-DevelopEnvUserVars -WorkerName $WorkerName -PeerWorker $PeerWorker
 
+if (-not $SkipNeverSleep) {
+    Write-InstallStep 'Configuring always-on power (never idle sleep)...'
+    Set-DevelopEnvNeverSleep
+    Write-InstallStep 'Optional once (elevated): .\power\apply-never-sleep-admin-once.ps1  # hibernate off, no auto-reboot while logged on'
+} else {
+    Write-InstallStep 'Skipped always-on power (-SkipNeverSleep). Worker stay-awake still applies while the host process runs.'
+}
+
 Write-InstallStep ''
-Write-InstallStep 'Done. Machine enrolled (personal My Machines fleet).'
+Write-InstallStep 'Done. Machine enrolled (personal My Machines fleet, always-on).'
 Write-InstallStep "  Worker name:     $WorkerName"
 if ($PeerWorker) {
     Write-InstallStep "  Peer worker:     $PeerWorker"

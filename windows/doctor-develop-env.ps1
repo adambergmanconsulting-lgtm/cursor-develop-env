@@ -37,7 +37,17 @@ if (Test-Path -LiteralPath $StartScriptPath) {
     $startText = Get-Content -LiteralPath $StartScriptPath -Raw
     Write-Check -Ok ($startText -match 'cursor-agent\.ps1' -and $startText -notmatch 'agent\.cmd') `
         -Message 'Start script invokes cursor-agent.ps1 in-process (not agent.cmd)'
+    Write-Check -Ok ($startText -match 'Hide-AutostartConsole|ShowWindow') `
+        -Message 'Start script force-hides console (ShowWindow)'
+    Write-Check -Ok ($startText -match 'Enable-WorkerStayAwake|SetThreadExecutionState') `
+        -Message 'Start script enables stay-awake while worker runs'
 }
+
+. "$PSScriptRoot\_WorkerAutostartCommon.ps1"
+Write-Check -Ok (Test-DevelopEnvNeverSleep) -Message 'Always-on power: AC standby timeout is never (0)'
+
+$legacyKeepAwake = Get-ScheduledTask -TaskName 'CursorSelfHosted-KeepAwake' -ErrorAction SilentlyContinue
+Write-Check -Ok ($null -eq $legacyKeepAwake) -Message 'No legacy CursorSelfHosted-KeepAwake task'
 
 Write-Check -Ok (Test-Path -LiteralPath $WorkerRoot) -Message "Machine workspace exists: $WorkerRoot"
 Write-Check -Ok (-not (Test-Path -LiteralPath (Join-Path $WorkerRoot '.git'))) `
@@ -52,21 +62,36 @@ if ($userPeer) {
     Write-Host "WARN User env CURSOR_DEV_PEER_WORKER unset (ok for single-machine)"
 }
 
-$workers = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like '*cursor-agent*' -and $_.CommandLine -like '*worker*' }
-Write-Check -Ok ([bool]$workers) -Message $(if ($workers) {
+$workers = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*cursor-agent*' -and $_.CommandLine -like '*worker*' })
+Write-Check -Ok ($workers.Count -ge 1) -Message $(if ($workers.Count -ge 1) {
         "Worker process running (pid $($workers.ProcessId -join ','))"
     } else {
         'Worker process running'
     })
+Write-Check -Ok ($workers.Count -le 1) -Message $(if ($workers.Count -le 1) {
+        'Exactly one worker process on this machine'
+    } else {
+        "Exactly one worker process (found $($workers.Count): pid $($workers.ProcessId -join ','))"
+    })
 
-$visiblePs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+$machineOk = $workers.Count -eq 1 -and
+    ($workers[0].CommandLine -like "*$WorkerRoot*") -and
+    ($workers[0].CommandLine -notlike '*TeamResume*')
+Write-Check -Ok $machineOk -Message "Worker is machine-scoped at $WorkerRoot"
+
+$agentCmdHost = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object {
-        $_.Name -eq 'powershell.exe' -and
+        ($_.Name -eq 'powershell.exe' -or $_.Name -eq 'pwsh.exe') -and
         $_.CommandLine -like '*cursor-agent.ps1*' -and
-        $_.CommandLine -like '*worker*'
+        $_.CommandLine -like '*worker*' -and
+        $_.CommandLine -notlike '*start-my-machines-worker.ps1*' -and
+        $_.CommandLine -notlike '*start-repo-worker.ps1*'
     }
-Write-Check -Ok (-not $visiblePs) -Message 'No intermediate powershell.exe hosting cursor-agent.ps1 worker'
+Write-Check -Ok (-not $agentCmdHost) -Message 'No agent.cmd-style powershell hosting cursor-agent.ps1 worker'
+
+$repoTask = Get-ScheduledTask -TaskName 'Cursor Agent Worker (repo)' -ErrorAction SilentlyContinue
+Write-Check -Ok ($null -eq $repoTask) -Message 'No repo-scoped autostart task registered'
 
 Write-Host ''
 if ($failed -gt 0) {
