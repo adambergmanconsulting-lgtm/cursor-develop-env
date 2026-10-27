@@ -1,20 +1,19 @@
-# Installs Cursor My Machines worker autostart tied to one git checkout (repo routing).
-#
-# Use when you want repo= labels and worker= / GitHub trigger routing for that repo.
-# Do not run both installers with the same -TaskName on one machine unless you intend to replace the task.
+# Optional: My Machines worker tied to one git checkout (repo= routing).
+# Prefer install-my-machines-autostart.ps1 (machine-scoped) for normal enroll.
 #
 # Usage:
 #   Set-ExecutionPolicy -Scope Process Bypass
-#   .\install-repo-worker-autostart.ps1 -WorkerDir 'E:\path\to\repo'
+#   .\install-repo-worker-autostart.ps1 -WorkerDir 'E:\path\to\repo' -WorkerName desktop -PeerWorker laptop
 #
 # Optional:
-#   .\install-repo-worker-autostart.ps1 -WorkerDir '...' -WorkerName "DESKTOP-TeamResume" -Uninstall
+#   .\install-repo-worker-autostart.ps1 -WorkerDir '...' -Uninstall
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string] $WorkerDir,
-    [string] $WorkerName = $env:COMPUTERNAME,
+    [string] $WorkerName = $(if ($env:CURSOR_DEV_WORKER_NAME) { $env:CURSOR_DEV_WORKER_NAME } else { $env:COMPUTERNAME }),
+    [string] $PeerWorker = $(if ($env:CURSOR_DEV_PEER_WORKER) { $env:CURSOR_DEV_PEER_WORKER } else { '' }),
     [string] $TaskName = 'Cursor Agent Worker (repo)',
     [switch] $Uninstall,
     [switch] $SkipAuthCheck
@@ -55,9 +54,15 @@ Write-WorkerStartScript -Path $startScriptPath -Agent $agentCmd -Root $WorkerDir
 Write-InstallStep "Registering scheduled task: $TaskName (at logon for $env:USERNAME)"
 Register-WorkerAutostartTask -Name $TaskName -ScriptPath $startScriptPath -Description "Cursor My Machines worker at logon for repo checkout: $WorkerDir"
 
+Write-InstallStep 'Setting personal fleet user env...'
+Set-DevelopEnvUserVars -WorkerName $WorkerName -PeerWorker $PeerWorker
+
 Write-InstallStep ''
 Write-InstallStep 'Done.'
 Write-InstallStep "  Worker name:     $WorkerName"
+if ($PeerWorker) {
+    Write-InstallStep "  Peer worker:     $PeerWorker"
+}
 Write-InstallStep "  Worker root:     $WorkerDir"
 Write-InstallStep "  Task:            $TaskName"
 Write-InstallStep "  Autostart log:   $autostartLog"
